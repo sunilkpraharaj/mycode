@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit JSON Visualizer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+
+        .container {
+            max-width: 95%;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            background-color: #343a40;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .json-input {
+            min-height: 150px;
+            font-family: monospace;
+        }
+
+        .transaction-card {
+            margin-bottom: 20px;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .transaction-header {
+            background-color: #e9ecef;
+            padding: 10px 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .transaction-header:hover {
+            background-color: #d1d7dc;
+        }
+
+        .service-id {
+            font-weight: bold;
+            color: #0d6efd;
+        }
+
+        .additional-props {
+            margin-left: 20px;
+            border-left: 3px solid #6c757d;
+            padding-left: 15px;
+        }
+
+        .prop-title {
+            font-weight: bold;
+            color: #6c757d;
+            cursor: pointer;
+        }
+
+        .prop-title:hover {
+            color: #495057;
+        }
+
+        .prop-content {
+            margin-left: 15px;
+            padding: 5px;
+            background-color: #f8f9fa;
+            border-radius: 3px;
+        }
+
+        .table {
+            font-size: 14px;
+        }
+
+        .table th {
+            background-color: #343a40;
+            color: white;
+        }
+
+        .table tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+
+        .table tr:hover {
+            background-color: #e9ecef;
+        }
+
+        .badge-added {
+            background-color: #28a745;
+        }
+
+        .badge-updated {
+            background-color: #ffc107;
+            color: #212529;
+        }
+
+        .badge-deleted {
+            background-color: #dc3545;
+        }
+
+        .changed-param {
+            font-weight: bold;
+            color: #dc3545;
+        }
+
+        .file-upload {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .file-upload-input {
+            position: absolute;
+            font-size: 100px;
+            opacity: 0;
+            right: 0;
+            top: 0;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .button-group .btn {
+            flex: 1;
+        }
+
+        .mod-type-table {
+            margin-bottom: 15px;
+        }
+
+        .mod-type-table th {
+            background-color: #495057;
+        }
+
+        .empty-message {
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        .null-value {
+            color: #6c757d;
+            font-style: italic;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header text-center">
+            <h2>Audit JSON Visualizer</h2>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <h5>Enter JSON Data:</h5>
+                <textarea id="jsonInput" class="form-control json-input"
+                    placeholder="Paste your audit JSON Data[] here..."></textarea>
+            </div>
+            <div class="col-md-6">
+                <h5>Or Upload JSON File:</h5>
+                <div class="input-group mb-3">
+                    <button class="btn btn-outline-secondary file-upload" type="button">
+                        <i class="fas fa-upload"></i> Choose File
+                        <input type="file" id="fileUpload" class="file-upload-input" accept=".json">
+                    </button>
+                    <input type="text" class="form-control" placeholder="No file chosen" readonly id="fileName">
+                </div>
+                <div class="button-group mb-3">
+                    <button id="parseBtn" class="btn btn-primary">
+                        <i class="fas fa-code"></i> Parse JSON
+                    </button>
+                    <button id="clearBtn" class="btn btn-secondary">
+                        <i class="fas fa-broom"></i> Clear JSON
+                    </button>
+                </div>
+                <div id="errorAlert" class="alert alert-danger mt-3 d-none" role="alert"></div>
+            </div>
+        </div>
+        <!-- Filters -->
+        <div class="row mb-3 d-none" id="filtersContainer">
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+
+                <!-- Entity Dropdown -->
+                <div style="flex: 1;">
+                    <select id="entityDropdown" class="form-select form-select-sm">
+                        <option value="">-- Select Entity --</option>
+                    </select>
+                </div>
+
+                <!-- Changed Parameter -->
+                <div style="flex: 1;">
+                    <input type="text" id="paramFilter" class="form-control form-control-sm"
+                        placeholder="Changed Parameter">
+                </div>
+
+                <!-- Old Value -->
+                <div style="flex: 1;">
+                    <input type="text" id="oldValueFilter" class="form-control form-control-sm" placeholder="Old Value">
+                </div>
+
+                <!-- New Value -->
+                <div style="flex: 1;">
+                    <input type="text" id="newValueFilter" class="form-control form-control-sm" placeholder="New Value">
+                </div>
+
+                <!-- Apply Button -->
+                <div style="flex: 0 0 auto;">
+                    <button id="applyFilterBtn" class="btn btn-success btn-sm">Apply</button>
+                </div>
+
+                <!-- Clear Button -->
+                <div style="flex: 0 0 auto;">
+                    <button id="clearFilterBtn" class="btn btn-secondary btn-sm">Clear</button>
+                </div>
+
+            </div>
+        </div>
+
+
+        <div id="resultsContainer" class="d-none">
+            <h4>Transaction Details</h4>
+            <div id="transactionsList"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const jsonInput = document.getElementById('jsonInput');
+            const fileUpload = document.getElementById('fileUpload');
+            const fileName = document.getElementById('fileName');
+            const parseBtn = document.getElementById('parseBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const resultsContainer = document.getElementById('resultsContainer');
+            const transactionsList = document.getElementById('transactionsList');
+            const errorAlert = document.getElementById('errorAlert');
+            const filtersContainer = document.getElementById('filtersContainer');
+
+            // Store all transactions for filtering
+            let allTransactions = [];
+
+            // Handle file upload
+            fileUpload.addEventListener('change', function (e) {
+                if (this.files.length > 0) {
+                    fileName.value = this.files[0].name;
+
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        jsonInput.value = e.target.result;
+                    };
+                    reader.readAsText(this.files[0]);
+                }
+            });
+
+            // Call this once after parsing your JSON
+            function initializeTransactions(transactions) {
+                // Sort by timestamp (newest first)
+                transactions.sort((a, b) => new Date(b.CreatedTimestamp) - new Date(a.CreatedTimestamp));
+
+                // Assign permanent numbers (oldest = #1, latest = #N)
+                transactions.forEach((txn, index) => {
+                    txn.txnNumber = transactions.length - index;
+                });
+
+                allTransactions = transactions; // store globally
+                renderTransactions(allTransactions);
+            }
+
+
+            // Parse JSON data
+            parseBtn.addEventListener('click', function () {
+                try {
+                    errorAlert.classList.add('d-none');
+
+                    const jsonData = jsonInput.value.trim();
+                    if (!jsonData) {
+                        throw new Error('Please enter or upload JSON data');
+                    }
+
+                    let parsedData = JSON.parse(jsonData);
+                    let transactions;
+
+                    // Case 1: Input is an array at root
+                    if (Array.isArray(parsedData)) {
+                        transactions = parsedData;
+                        initializeTransactions(transactions);
+
+                        // Case 2: Input has a top-level "Data" property
+                    } else if (parsedData.Data && Array.isArray(parsedData.Data)) {
+                        transactions = parsedData.Data;
+                        initializeTransactions(transactions);
+
+                        // Case 3: Input has a top-level "data" object with "Data" inside
+                    } else if (parsedData.data && parsedData.data.Data && Array.isArray(parsedData.data.Data)) {
+                        transactions = parsedData.data.Data;
+                        initializeTransactions(transactions);
+
+                        // Case 4: Fallback to single object
+                    } else {
+                        transactions = [parsedData];
+                    }
+
+                    populateEntityDropdown(allTransactions);
+                    resultsContainer.classList.remove('d-none');
+                    filtersContainer.classList.remove('d-none');
+                } catch (error) {
+                    errorAlert.textContent = `Error: ${error.message}`;
+                    errorAlert.classList.remove('d-none');
+                    console.error(error);
+                }
+            });
+
+            // Clear all inputs and results
+            clearBtn.addEventListener('click', function () {
+                jsonInput.value = '';
+                fileUpload.value = '';
+                fileName.value = '';
+                transactionsList.innerHTML = '';
+                resultsContainer.classList.add('d-none');
+                errorAlert.classList.add('d-none');
+                filtersContainer.classList.add('d-none');
+                allTransactions = [];
+            });
+
+            // Format null values
+            function formatValue(value) {
+                return value === null || value === undefined ?
+                    '<span class="null-value">null</span>' :
+                    (typeof value === 'object' ? JSON.stringify(value) : value);
+            }
+
+
+            // Render transactions
+            function renderTransactions(transactions) {
+                transactionsList.innerHTML = '';
+
+                // Sort by timestamp (newest first)
+                transactions.sort((a, b) => new Date(b.CreatedTimestamp) - new Date(a.CreatedTimestamp));
+
+                transactions.forEach((transaction, index) => {
+                    const transactionCard = document.createElement('div');
+                    transactionCard.className = 'transaction-card';
+
+                    // Transaction header
+                    const header = document.createElement('div');
+                    header.className = 'transaction-header';
+
+                    let serviceOrPath = '';
+                    if (transaction.ServiceId) {
+                        serviceOrPath = `<span class="service-id">Service Id: ${transaction.ServiceId}</span>`;
+                    } else if (transaction.PathUrl) {
+                        serviceOrPath = `<span style="color:rgba(0,128,0,0.7); font-weight:bold;">Path Url: ${transaction.PathUrl}</span>`;
+                    }
+
+                    // Numbering so oldest = #1, latest = #N
+                    // const transactionNumber = transactions.length - index;
+                    header.innerHTML = `
+                        <div>
+                            <span class="badge bg-light text-dark me-2">#${transaction.txnNumber}</span> 
+                            ${serviceOrPath} - 
+                            ${transaction.RootEntity}: ${transaction.RootEntityId} - 
+                            ${new Date(transaction.CreatedTimestamp).toLocaleString()}
+                        </div>
+                        <div>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                    `;
+                    transactionCard.appendChild(header);
+                    transactionsList.appendChild(transactionCard);
+
+
+                    // Transaction content
+                    const content = document.createElement('div');
+                    content.className = 'p-3 transaction-content';
+                    content.style.display = 'none';
+
+                    // Basic info
+                    const basicInfo = document.createElement('div');
+                    basicInfo.className = 'mb-4';
+                    basicInfo.innerHTML = `
+                        <h5>Basic Information</h5>
+                        <div class="row">
+                            <div class="col-md-4"><strong>Org ID:</strong> ${transaction.OrgId}</div>
+                            <div class="col-md-4"><strong>Trace ID:</strong> ${transaction.TraceId}</div>
+                            <div class="col-md-4"><strong>Updated By:</strong> ${transaction.UpdatedBy}</div>
+                            <div class="col-md-4"><strong>Version:</strong> ${transaction.Version}</div>
+                            <div class="col-md-4"><strong>Time Taken:</strong> ${transaction.TimeTaken} ms</div>
+                            <div class="col-md-4"><strong>Created:</strong> ${new Date(transaction.CreatedTimestamp).toLocaleString()}</div>
+                            <div class="col-md-4"><strong>InBoundMessageType:</strong> ${formatValue(transaction.InBoundMessageType)}</div>
+                            <div class="col-md-4"><strong>AuditSummary:</strong> ${formatValue(transaction.AuditSummary)}</div>
+                            <div class="col-md-4"><strong>Event:</strong> ${formatValue(transaction.Event)}</div>
+                            <div class="col-md-4"><strong>Trace:</strong> ${formatValue(transaction.Trace)}</div>
+                            <div class="col-md-4"><strong>AuditPropertiesList:</strong> ${formatValue(transaction.AuditPropertiesList)}</div>
+                            <div class="col-md-4"><strong>RootEntity:</strong> ${formatValue(transaction.RootEntity)}</div>
+                            <div class="col-md-4"><strong>OriginatedAPI:</strong> ${formatValue(transaction.OriginatedAPI)}</div>
+                            <div class="col-md-4"><strong>ContextId:</strong> ${transaction.ContextId}</div>
+                        </div>
+                    `;
+                    content.appendChild(basicInfo);
+
+                    // Root Entity IDs
+                    if (transaction.RootEntityIds) {
+                        const rootEntityIdsSection = document.createElement('div');
+                        rootEntityIdsSection.className = 'mb-4 additional-props';
+
+                        const rootEntityIdsTitle = document.createElement('div');
+                        rootEntityIdsTitle.className = 'prop-title';
+                        rootEntityIdsTitle.innerHTML = '<i class="fas fa-caret-right me-2"></i>Root Entity IDs';
+                        rootEntityIdsTitle.addEventListener('click', function () {
+                            const icon = this.querySelector('i');
+                            const content = this.nextElementSibling;
+
+                            if (content.style.display === 'none') {
+                                content.style.display = 'block';
+                                icon.classList.remove('fa-caret-right');
+                                icon.classList.add('fa-caret-down');
+                            } else {
+                                content.style.display = 'none';
+                                icon.classList.remove('fa-caret-down');
+                                icon.classList.add('fa-caret-right');
+                            }
+                        });
+
+                        const rootEntityIdsContent = document.createElement('div');
+                        rootEntityIdsContent.className = 'prop-content';
+                        rootEntityIdsContent.style.display = 'none';
+
+                        const rootEntityIdsTable = document.createElement('table');
+                        rootEntityIdsTable.className = 'table table-sm table-bordered';
+                        rootEntityIdsTable.innerHTML = `
+                            <thead>
+                                <tr>
+                                    <th>Key</th>
+                                    <th>Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${Object.entries(transaction.RootEntityIds).map(([key, value]) => `
+                                    <tr>
+                                        <td>${key}</td>
+                                        <td>${formatValue(value)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        `;
+                        rootEntityIdsContent.appendChild(rootEntityIdsTable);
+
+                        rootEntityIdsSection.appendChild(rootEntityIdsTitle);
+                        rootEntityIdsSection.appendChild(rootEntityIdsContent);
+                        content.appendChild(rootEntityIdsSection);
+                    }
+
+                    // Audit Client Properties
+                    if (transaction.HttpClientAuditList) {
+                        const httpClientAuditSection = document.createElement('div');
+                        httpClientAuditSection.className = 'mb-4 additional-props';
+
+                        const httpClientAuditTitle = document.createElement('div');
+                        httpClientAuditTitle.className = 'prop-title';
+                        httpClientAuditTitle.innerHTML = '<i class="fas fa-caret-right me-2"></i>Http Client Audit List';
+                        httpClientAuditTitle.addEventListener('click', function () {
+                            const icon = this.querySelector('i');
+                            const content = this.nextElementSibling;
+
+                            if (content.style.display === 'none') {
+                                content.style.display = 'block';
+                                icon.classList.remove('fa-caret-right');
+                                icon.classList.add('fa-caret-down');
+                            } else {
+                                content.style.display = 'none';
+                                icon.classList.remove('fa-caret-down');
+                                icon.classList.add('fa-caret-right');
+                            }
+                        });
+
+                        const httpClientAuditContent = document.createElement('div');
+                        httpClientAuditContent.className = 'prop-content';
+                        httpClientAuditContent.style.display = 'none';
+
+                        const httpClientAuditTable = document.createElement('table');
+                        httpClientAuditTable.className = 'table table-sm table-bordered';
+                        httpClientAuditTable.innerHTML = `
+                            <thead>
+                                <tr>
+                                    <th>Element</th>
+                                    <th>Url</th>
+                                    <th>HttpMethod</th>
+                                    <th>StatusCode</th>
+                                    <th>TimeTaken</th>
+                                    <th>ErrorMessage</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${Object.entries(transaction.HttpClientAuditList).map(([key, value]) => `
+                                    <tr>
+                                        <td>${key}</td>
+                                        <td>${formatValue(value.Url)}</td>
+                                        <td>${formatValue(value.HttpMethod)}</td>
+                                        <td>${formatValue(value.StatusCode)}</td>
+                                        <td>${formatValue(value.TimeTaken)}</td>
+                                        <td>${formatValue(value.ErrorMessage)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        `;
+                        httpClientAuditContent.appendChild(httpClientAuditTable);
+
+                        httpClientAuditSection.appendChild(httpClientAuditTitle);
+                        httpClientAuditSection.appendChild(httpClientAuditContent);
+                        content.appendChild(httpClientAuditSection);
+                    }
+
+                    // Header Values
+                    if (transaction.HeaderValues) {
+                        const headerValuesSection = document.createElement('div');
+                        headerValuesSection.className = 'mb-4 additional-props';
+
+                        const headerValuesTitle = document.createElement('div');
+                        headerValuesTitle.className = 'prop-title';
+                        headerValuesTitle.innerHTML = '<i class="fas fa-caret-right me-2"></i>Header Values';
+                        headerValuesTitle.addEventListener('click', function () {
+                            const icon = this.querySelector('i');
+                            const content = this.nextElementSibling;
+
+                            if (content.style.display === 'none') {
+                                content.style.display = 'block';
+                                icon.classList.remove('fa-caret-right');
+                                icon.classList.add('fa-caret-down');
+                            } else {
+                                content.style.display = 'none';
+                                icon.classList.remove('fa-caret-down');
+                                icon.classList.add('fa-caret-right');
+                            }
+                        });
+
+                        const headerValuesContent = document.createElement('div');
+                        headerValuesContent.className = 'prop-content';
+                        headerValuesContent.style.display = 'none';
+
+                        const headerValuesTable = document.createElement('table');
+                        headerValuesTable.className = 'table table-sm table-bordered';
+                        headerValuesTable.innerHTML = `
+                            <thead>
+                                <tr>
+                                    <th>Key</th>
+                                    <th>Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${Object.entries(transaction.HeaderValues).map(([key, value]) => `
+                                    <tr>
+                                        <td>${key}</td>
+                                        <td>${formatValue(value)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        `;
+                        headerValuesContent.appendChild(headerValuesTable);
+
+                        headerValuesSection.appendChild(headerValuesTitle);
+                        headerValuesSection.appendChild(headerValuesContent);
+                        content.appendChild(headerValuesSection);
+                    }
+
+                    // Additional Properties
+                    if (transaction.AdditionalProperties) {
+                        const additionalProps = document.createElement('div');
+                        additionalProps.className = 'mb-4 additional-props';
+
+                        const propsTitle = document.createElement('div');
+                        propsTitle.className = 'prop-title';
+                        propsTitle.innerHTML = '<i class="fas fa-caret-right me-2"></i>Additional Properties';
+                        propsTitle.addEventListener('click', function () {
+                            const icon = this.querySelector('i');
+                            const content = this.nextElementSibling;
+
+                            if (content.style.display === 'none') {
+                                content.style.display = 'block';
+                                icon.classList.remove('fa-caret-right');
+                                icon.classList.add('fa-caret-down');
+                            } else {
+                                content.style.display = 'none';
+                                icon.classList.remove('fa-caret-down');
+                                icon.classList.add('fa-caret-right');
+                            }
+                        });
+
+                        const propsContent = document.createElement('div');
+                        propsContent.className = 'prop-content';
+                        propsContent.style.display = 'none';
+
+                        // User Exits
+                        if (transaction.AdditionalProperties.UserExitsTriggered) {
+                            const userExitsTitle = document.createElement('div');
+                            userExitsTitle.className = 'prop-title';
+                            userExitsTitle.innerHTML = '<i class="fas fa-caret-right me-2"></i>User Exits Triggered';
+                            userExitsTitle.addEventListener('click', function () {
+                                const icon = this.querySelector('i');
+                                const content = this.nextElementSibling;
+
+                                if (content.style.display === 'none') {
+                                    content.style.display = 'block';
+                                    icon.classList.remove('fa-caret-right');
+                                    icon.classList.add('fa-caret-down');
+                                } else {
+                                    content.style.display = 'none';
+                                    icon.classList.remove('fa-caret-down');
+                                    icon.classList.add('fa-caret-right');
+                                }
+                            });
+
+                            const userExitsContent = document.createElement('div');
+                            userExitsContent.className = 'prop-content';
+                            userExitsContent.style.display = 'none';
+
+                            const userExitsTable = document.createElement('table');
+                            userExitsTable.className = 'table table-sm table-bordered';
+                            userExitsTable.innerHTML = `
+                                <thead>
+                                    <tr>
+                                        <th>Exit Point</th>
+                                        <th>Handler</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${Object.entries(transaction.AdditionalProperties.UserExitsTriggered).map(([key, value]) => `
+                                        <tr>
+                                            <td>${key}</td>
+                                            <td>${value}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            `;
+                            userExitsContent.appendChild(userExitsTable);
+
+                            propsContent.appendChild(userExitsTitle);
+                            propsContent.appendChild(userExitsContent);
+                        }
+
+                        // Mod Types
+                        if (transaction.AdditionalProperties.ModTypesTriggered) {
+                            const modTypesTitle = document.createElement('div');
+                            modTypesTitle.className = 'prop-title';
+                            modTypesTitle.innerHTML = '<i class="fas fa-caret-right me-2"></i>Mod Types Triggered';
+                            modTypesTitle.addEventListener('click', function () {
+                                const icon = this.querySelector('i');
+                                const content = this.nextElementSibling;
+
+                                if (content.style.display === 'none') {
+                                    content.style.display = 'block';
+                                    icon.classList.remove('fa-caret-right');
+                                    icon.classList.add('fa-caret-down');
+                                } else {
+                                    content.style.display = 'none';
+                                    icon.classList.remove('fa-caret-down');
+                                    icon.classList.add('fa-caret-right');
+                                }
+                            });
+
+                            const modTypesContent = document.createElement('div');
+                            modTypesContent.className = 'prop-content';
+                            modTypesContent.style.display = 'none';
+
+                            // Process mod types
+                            const modTypes = transaction.AdditionalProperties.ModTypesTriggered;
+
+                            // Order Mod Types
+                            if (modTypes.OrderModTypes && modTypes.OrderModTypes.length > 0) {
+                                const orderModTypesTable = document.createElement('table');
+                                orderModTypesTable.className = 'table table-sm table-bordered mod-type-table';
+                                orderModTypesTable.innerHTML = `
+                                    <thead>
+                                        <tr>
+                                            <th colspan="2">Order Mod Types</th>
+                                        </tr>
+                                        <tr>
+                                            <th>Index</th>
+                                            <th>Mod Type</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${modTypes.OrderModTypes.map((modType, idx) => `
+                                            <tr>
+                                                <td>${idx + 1}</td>
+                                                <td>${modType}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                `;
+                                modTypesContent.appendChild(orderModTypesTable);
+                            } else {
+                                const emptyMessage = document.createElement('div');
+                                emptyMessage.className = 'empty-message mb-3';
+                                emptyMessage.textContent = 'No Order Mod Types found';
+                                modTypesContent.appendChild(emptyMessage);
+                            }
+
+                            // Order Mod Types With Services
+                            if (modTypes.OrderModTypesWithServices && Object.keys(modTypes.OrderModTypesWithServices).length > 0) {
+                                const orderModTypesWithServicesTable = document.createElement('table');
+                                orderModTypesWithServicesTable.className = 'table table-sm table-bordered mod-type-table';
+                                orderModTypesWithServicesTable.innerHTML = `
+                                    <thead>
+                                        <tr>
+                                            <th colspan="2">Order Mod Types With Services</th>
+                                        </tr>
+                                        <tr>
+                                            <th>Mod Type</th>
+                                            <th>Services</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${Object.entries(modTypes.OrderModTypesWithServices).map(([modType, services]) => `
+                                            <tr>
+                                                <td>${modType}</td>
+                                                <td>${services.length > 0 ? services.join(', ') : 'None'}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                `;
+                                modTypesContent.appendChild(orderModTypesWithServicesTable);
+                            } else {
+                                const emptyMessage = document.createElement('div');
+                                emptyMessage.className = 'empty-message mb-3';
+                                emptyMessage.textContent = 'No Order Mod Types With Services found';
+                                modTypesContent.appendChild(emptyMessage);
+                            }
+
+                            // Order Line Mod Types
+                            if (modTypes.OrderLineModTypes && Object.keys(modTypes.OrderLineModTypes).length > 0) {
+                                const orderLineModTypesTable = document.createElement('table');
+                                orderLineModTypesTable.className = 'table table-sm table-bordered mod-type-table';
+                                orderLineModTypesTable.innerHTML = `
+                                    <thead>
+                                        <tr>
+                                            <th colspan="2">Order Line Mod Types</th>
+                                        </tr>
+                                        <tr>
+                                            <th>Order Line ID</th>
+                                            <th>Mod Types</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${Object.entries(modTypes.OrderLineModTypes).map(([orderLineId, modTypesList]) => `
+                                            <tr>
+                                                <td>${orderLineId}</td>
+                                                <td>${modTypesList.length > 0 ? modTypesList.join(', ') : 'None'}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                `;
+                                modTypesContent.appendChild(orderLineModTypesTable);
+                            } else {
+                                const emptyMessage = document.createElement('div');
+                                emptyMessage.className = 'empty-message mb-3';
+                                emptyMessage.textContent = 'No Order Line Mod Types found';
+                                modTypesContent.appendChild(emptyMessage);
+                            }
+
+                            // Order Line Mod Types With Services
+                            if (modTypes.OrderLineModTypesWithServices && Object.keys(modTypes.OrderLineModTypesWithServices).length > 0) {
+                                const orderLineModTypesWithServicesTable = document.createElement('table');
+                                orderLineModTypesWithServicesTable.className = 'table table-sm table-bordered mod-type-table';
+                                orderLineModTypesWithServicesTable.innerHTML = `
+                                    <thead>
+                                        <tr>
+                                            <th colspan="3">Order Line Mod Types With Services</th>
+                                        </tr>
+                                        <tr>
+                                            <th>Order Line ID</th>
+                                            <th>Mod Type</th>
+                                            <th>Services</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${Object.entries(modTypes.OrderLineModTypesWithServices).map(([orderLineId, modTypesObj]) => {
+                                    let rows = '';
+                                    if (Object.keys(modTypesObj).length > 0) {
+                                        rows = Object.entries(modTypesObj).map(([modType, services]) => `
+                                                    <tr>
+                                                        <td>${orderLineId}</td>
+                                                        <td>${modType}</td>
+                                                        <td>${services.length > 0 ? services.join(', ') : 'None'}</td>
+                                                    </tr>
+                                                `).join('');
+                                    } else {
+                                        rows = `<tr><td>${orderLineId}</td><td colspan="2">No mod types with services</td></tr>`;
+                                    }
+                                    return rows;
+                                }).join('')}
+                                    </tbody>
+                                `;
+                                modTypesContent.appendChild(orderLineModTypesWithServicesTable);
+                            } else {
+                                const emptyMessage = document.createElement('div');
+                                emptyMessage.className = 'empty-message mb-3';
+                                emptyMessage.textContent = 'No Order Line Mod Types With Services found';
+                                modTypesContent.appendChild(emptyMessage);
+                            }
+
+                            propsContent.appendChild(modTypesTitle);
+                            propsContent.appendChild(modTypesContent);
+                        }
+
+                        // Other properties
+                        const otherProps = Object.entries(transaction.AdditionalProperties)
+                            .filter(([key]) => !['UserExitsTriggered', 'ModTypesTriggered'].includes(key));
+
+                        if (otherProps.length > 0) {
+                            const otherPropsTitle = document.createElement('div');
+                            otherPropsTitle.className = 'prop-title';
+                            otherPropsTitle.innerHTML = '<i class="fas fa-caret-right me-2"></i>Other Properties';
+                            otherPropsTitle.addEventListener('click', function () {
+                                const icon = this.querySelector('i');
+                                const content = this.nextElementSibling;
+
+                                if (content.style.display === 'none') {
+                                    content.style.display = 'block';
+                                    icon.classList.remove('fa-caret-right');
+                                    icon.classList.add('fa-caret-down');
+                                } else {
+                                    content.style.display = 'none';
+                                    icon.classList.remove('fa-caret-down');
+                                    icon.classList.add('fa-caret-right');
+                                }
+                            });
+
+                            const otherPropsContent = document.createElement('div');
+                            otherPropsContent.className = 'prop-content';
+                            otherPropsContent.style.display = 'none';
+
+                            const otherPropsTable = document.createElement('table');
+                            otherPropsTable.className = 'table table-sm table-bordered';
+                            otherPropsTable.innerHTML = `
+                                <thead>
+                                    <tr>
+                                        <th>Property</th>
+                                        <th>Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${otherProps.map(([key, value]) => `
+                                        <tr>
+                                            <td>${key}</td>
+                                            <td>${typeof value === 'object' ? JSON.stringify(value) : value}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            `;
+                            otherPropsContent.appendChild(otherPropsTable);
+
+                            propsContent.appendChild(otherPropsTitle);
+                            propsContent.appendChild(otherPropsContent);
+                        }
+
+                        additionalProps.appendChild(propsTitle);
+                        additionalProps.appendChild(propsContent);
+                        content.appendChild(additionalProps);
+                    }
+
+                    // Audit table
+                    // Audit table
+                    if (transaction.Audit && transaction.Audit.length > 0) {
+                        const auditSection = document.createElement('div');
+                        auditSection.className = 'mb-4';
+                        auditSection.innerHTML = '<h5>Audit Details</h5>';
+
+                        const auditTable = document.createElement('table');
+                        auditTable.className = 'table table-bordered table-hover';
+                        auditTable.innerHTML = `
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>User</th>
+                <th>Entity</th>
+                <th>Business Key</th> 
+                <th>Activity</th>
+                <th>Description</th>
+                <th>Changed Parameter</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${transaction.Audit.map(audit => {
+                            // Build details from ChangedParameters
+                            const details = (audit.ChangedParameters || []).map(cp => ({
+                                OldValue: cp.value || cp.OldValue || 'N/A',
+                                NewValue: cp.To || cp.NewValue || 'N/A'
+                            }));
+
+                            // Render BusinessKey as a mini table
+                            const businessKeyHtml = audit.BusinessKey && audit.BusinessKey.length > 0
+                                ? `<table class="table table-sm table-bordered mb-0">
+                           <tbody>
+                               ${audit.BusinessKey.map(bk => `
+                                   <tr>
+                                       <td><strong>${bk.Key}</strong></td>
+                                       <td>${bk.Value}</td>
+                                   </tr>
+                               `).join('')}
+                           </tbody>
+                       </table>`
+                                : 'N/A';
+
+                            return `
+                    <tr>
+                        <td>${new Date(transaction.CreatedTimestamp).toLocaleString()}</td>
+                        <td>${transaction.UpdatedBy}</td>
+                        <td>${audit.EntityName}</td>
+                        <td>${businessKeyHtml}</td>
+                        <td>
+                            <span class="badge ${getActivityBadgeClass(audit.Activity)}">
+                                ${audit.Activity}
+                            </span>
+                        </td>
+                        <td>${audit.Description || 'N/A'}</td>
+                        <td>
+                            ${audit.ChangedParameters && audit.ChangedParameters.length > 0
+                                    ? audit.ChangedParameters.map(cp =>
+                                        `<span class="changed-param">${cp.ChangedParameter}</span>`
+                                    ).join('<br>')
+                                    : 'N/A'}
+                        </td>
+                        <td>
+                            ${details.length > 0
+                                    ? details.map(d =>
+                                        `From: ${d.OldValue}<br>To: ${d.NewValue}`
+                                    ).join('<br><br>')
+                                    : 'N/A'}
+                        </td>
+                    </tr>
+                `;
+                        }).join('')}
+        </tbody>
+    `;
+
+                        auditSection.appendChild(auditTable);
+                        content.appendChild(auditSection);
+                    } else {
+                        content.innerHTML += '<p>No audit data available</p>';
+                    }
+
+                    transactionCard.appendChild(header);
+                    transactionCard.appendChild(content);
+
+
+
+
+                // Toggle content visibility
+                header.addEventListener('click', function () {
+                    const icon = this.querySelector('i');
+                    const content = this.nextElementSibling;
+
+                    if (content.style.display === 'none') {
+                        content.style.display = 'block';
+                        icon.classList.remove('fa-chevron-down');
+                        icon.classList.add('fa-chevron-up');
+                    } else {
+                        content.style.display = 'none';
+                        icon.classList.remove('fa-chevron-up');
+                        icon.classList.add('fa-chevron-down');
+                    }
+                });
+
+                transactionsList.appendChild(transactionCard);
+            });
+            }
+
+        function getActivityBadgeClass(activity) {
+            switch (activity.toUpperCase()) {
+                case 'ADDED': return 'badge-added';
+                case 'UPDATED': return 'badge-updated';
+                case 'DELETED': return 'badge-deleted';
+                default: return 'badge-secondary';
+            }
+        }
+
+        // Populate dropdown with unique entities
+        function populateEntityDropdown(transactions) {
+            const dropdown = document.getElementById('entityDropdown');
+            const entities = new Set();
+
+            transactions.forEach(txn => {
+                if (txn.Audit && Array.isArray(txn.Audit)) {
+                    txn.Audit.forEach(audit => {
+                        if (audit.EntityName) {
+                            entities.add(audit.EntityName);
+                        }
+                    });
+                }
+            });
+
+            // Clear existing
+            dropdown.innerHTML = '<option value="">-- Select Entity --</option>';
+
+            // Add sorted entities
+            Array.from(entities).sort().forEach(entity => {
+                const option = document.createElement('option');
+                option.value = entity;
+                option.textContent = entity;
+                dropdown.appendChild(option);
+            });
+        }
+
+        // Sync dropdown with textbox
+        document.getElementById('entityDropdown').addEventListener('change', function () {
+            document.getElementById('entityFilter').value = this.value;
+        });
+
+        // Apply Filter with exact, case-sensitive matching
+        document.getElementById('applyFilterBtn').addEventListener('click', () => {
+            const entityFilter = document.getElementById('entityDropdown').value.trim();
+            const paramFilter = document.getElementById('paramFilter').value.trim();
+            const oldValueFilter = document.getElementById('oldValueFilter').value.trim();
+            const newValueFilter = document.getElementById('newValueFilter').value.trim();
+
+
+            // If no filters entered, show all
+            if (!entityFilter && !paramFilter && !oldValueFilter && !newValueFilter) {
+                renderTransactions(allTransactions);
+                return;
+            }
+
+            const filteredTransactions = allTransactions.map(txn => {
+                if (!txn.Audit || !Array.isArray(txn.Audit)) return null;
+
+                // Keep only the audit entries that exactly match filters (case-sensitive)
+                const matchingAudits = txn.Audit.filter(audit => {
+                    const matchesEntity = !entityFilter || (audit.EntityName === entityFilter); // CHANGED: exact, case-sensitive match
+                    const matchesParam = !paramFilter || (
+                        Array.isArray(audit.ChangedParameters) &&
+                        audit.ChangedParameters.some(cp => cp.ChangedParameter === paramFilter) // CHANGED: exact, case-sensitive match
+                    );
+                    const matchesOldValue = !oldValueFilter || (
+                        Array.isArray(audit.ChangedParameters) &&
+                        audit.ChangedParameters.some(cp => cp.OldValue === oldValueFilter) // CHANGED: exact, case-sensitive match
+                    );
+                    const matchesNewValue = !newValueFilter || (
+                        Array.isArray(audit.ChangedParameters) &&
+                        audit.ChangedParameters.some(cp => cp.NewValue === newValueFilter) // CHANGED: exact, case-sensitive match
+                    );
+                    return matchesEntity && matchesParam && matchesOldValue && matchesNewValue;
+                });
+
+                if (matchingAudits.length === 0) return null;
+
+                // Return a shallow copy of txn but with only matching audits
+                return { ...txn, Audit: matchingAudits }; // CHANGED: replaced Audit with only matches
+            }).filter(Boolean);
+
+            renderTransactions(filteredTransactions);
+        });
+
+
+        // Clear Filter
+        document.getElementById('clearFilterBtn').addEventListener('click', () => {
+            document.getElementById('entityDropdown').value = '';
+            document.getElementById('paramFilter').value = '';
+            document.getElementById('oldValueFilter').value = '';
+            document.getElementById('newValueFilter').value = '';
+            renderTransactions(allTransactions);
+            populateEntityDropdown(allTransactions);
+        });
+
+
+        });
+
+    </script>
+</body>
+
+</html>
