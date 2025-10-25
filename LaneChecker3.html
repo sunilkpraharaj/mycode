@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Lane Diagnostics</title>
+  <style>
+    :root {
+      --brand: #1a73e8;
+      --muted: #6b7280;
+      --card-bg: #fff;
+      --page-bg: #f3f5f8;
+      --danger: #d9534f;
+      --ok: #16a34a;
+    }
+
+    body {
+      font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--page-bg);
+      margin: 0;
+      padding: 28px;
+      color: #222;
+    }
+
+    .container {
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      text-align: center;
+      color: var(--brand);
+      margin-bottom: 14px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 18px;
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+    }
+
+    .grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    label {
+      font-weight: 600;
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    textarea,
+    input[type="text"],
+    select {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      background: #fbfdff;
+      font-family: monospace;
+      box-sizing: border-box;
+    }
+
+    textarea.json-input {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    .input-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    button {
+      flex: 1;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-weight: 700;
+      color: white;
+      background: var(--brand);
+      box-shadow: 0 6px 12px rgba(26, 115, 232, 0.18);
+    }
+
+    button.secondary {
+      background: #374151;
+      box-shadow: none;
+      opacity: 0.95;
+    }
+
+    .result {
+      margin-top: 18px;
+      background: #fff;
+      padding: 14px;
+      border-radius: 10px;
+      border-left: 6px solid var(--brand);
+    }
+
+    .box {
+      background: #fbfdff;
+      border-radius: 10px;
+      padding: 12px;
+      border: 1px solid #e6eefc;
+    }
+
+    .stat {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    .step-ok {
+      color: var(--ok);
+      font-weight: 700;
+    }
+
+    .step-miss {
+      color: var(--danger);
+      font-weight: 700;
+    }
+
+    .flow {
+      margin-top: 12px;
+      padding: 10px;
+      background: #fbfdff;
+      border-radius: 8px;
+      border: 1px dashed #e6eefc;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .highlight {
+      color: var(--brand);
+      font-weight: 700;
+    }
+
+    .small {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Lane Diagnostics</h1>
+    <div class="card">
+      <div class="grid">
+        <!-- JSON Inputs -->
+        <div class="input-row">
+          <div>
+            <label>Region Look Up JSON</label>
+            <textarea id="regionLookUp" class="json-input"></textarea>
+          </div>
+          <div>
+            <label>Region Schema JSON</label>
+            <textarea id="regionSchema" class="json-input"></textarea>
+          </div>
+        </div>
+        <div class="input-row">
+          <div>
+            <label>Region JSON</label>
+            <textarea id="regionData" class="json-input"></textarea>
+          </div>
+          <div>
+            <label>Zones JSON</label>
+            <textarea id="zonesData" class="json-input"></textarea>
+          </div>
+        </div>
+        <div>
+          <label>Transit Time JSON</label>
+          <textarea id="transitData" class="json-input"></textarea>
+        </div>
+
+        <!-- Source/Destination -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div>
+            <label>Source</label>
+            <select id="sourceType">
+              <option value="">-- Select Source Type --</option>
+              <option value="zipcode">Zipcode</option>
+              <option value="country">Country</option>
+              <option value="state">State</option>
+              <option value="location">Location</option>
+            </select>
+            <input id="sourceValue" class="hidden" type="text" placeholder="Enter value">
+          </div>
+          <div>
+            <label>Destination</label>
+            <select id="destType">
+              <option value="">-- Select Destination Type --</option>
+              <option value="zipcode">Zipcode</option>
+              <option value="country">Country</option>
+              <option value="state">State</option>
+              <option value="location">Location</option>
+            </select>
+            <input id="destValue" class="hidden" type="text" placeholder="Enter value">
+          </div>
+        </div>
+
+        <!-- Carrier/Service -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div>
+            <label>Carrier Code</label>
+            <input id="carrierCode" type="text" placeholder="Enter Carrier Code">
+          </div>
+          <div>
+            <label>Service Level Code</label>
+            <input id="serviceLevel" type="text" placeholder="Enter Service Level Code">
+          </div>
+        </div>
+
+        <div class="actions">
+          <button onclick="findLinkChain()">Find Route</button>
+          <button class="secondary" onclick="clearJsons()">Clear JSONs</button>
+        </div>
+
+        <div id="output" class="result">
+          <div class="small">Paste JSONs and enter details, then click <span class="highlight">Find Route</span>.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById("sourceType").addEventListener("change", e => {
+      const input = document.getElementById("sourceValue");
+      input.classList.toggle("hidden", !e.target.value);
+      if (e.target.value)
+        input.placeholder = "Enter " + e.target.options[e.target.selectedIndex].text;
+    });
+    document.getElementById("destType").addEventListener("change", e => {
+      const input = document.getElementById("destValue");
+      input.classList.toggle("hidden", !e.target.value);
+      if (e.target.value)
+        input.placeholder = "Enter " + e.target.options[e.target.selectedIndex].text;
+    });
+
+    function safeParse(txt) {
+      if (!txt || !txt.trim()) return null;
+      try { return JSON.parse(txt); }
+      catch (e) { throw new Error("Invalid JSON - " + e.message); }
+    }
+
+    function escapeHtml(s) {
+      return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function findRegionForZip(zip, regions) {
+      const num = parseInt(zip, 10);
+      for (const region of regions || [])
+        for (const dtl of region.RegionDtl || [])
+          if (num >= parseInt(dtl.ZipStart, 10) && num <= parseInt(dtl.ZipEnd, 10))
+            return { region, dtl };
+      return null;
+    }
+
+    function findRegionByTypeAndField(type, field, val, regions) {
+      const target = String(val || "").trim().toUpperCase();
+      for (const region of regions || [])
+        if (region.RegionType && region.RegionType.RegionTypeId === type)
+          for (const dtl of region.RegionDtl || [])
+            if (String(dtl[field] || "").trim().toUpperCase() === target)
+              return { region, dtl };
+      return null;
+    }
+
+    function findSchemaEntry(list, name) {
+      return (list || []).find(s => s.RegionSchemaName === name);
+    }
+
+    function findLookupEntry(list, name) {
+      return (list || []).find(l => l.RegionSchemaName === name);
+    }
+
+    function findLinkChain() {
+      const out = document.getElementById("output");
+      const missing = [];
+      let schemaMissing = false, lookupMissing = false;
+      out.innerHTML = "<div class='small'>Processing…</div>";
+
+      try {
+        const lookups = safeParse(document.getElementById("regionLookUp").value) || [];
+        const schemas = safeParse(document.getElementById("regionSchema").value) || [];
+        const regions = safeParse(document.getElementById("regionData").value) || [];
+        const zones = safeParse(document.getElementById("zonesData").value) || [];
+        const transits = safeParse(document.getElementById("transitData").value) || [];
+
+        const srcType = document.getElementById("sourceType").value;
+        const dstType = document.getElementById("destType").value;
+        const srcVal = document.getElementById("sourceValue").value.trim();
+        const dstVal = document.getElementById("destValue").value.trim();
+        const carrier = document.getElementById("carrierCode").value.trim();
+        const service = document.getElementById("serviceLevel").value.trim();
+
+        const finders = {
+          zipcode: v => findRegionForZip(v, regions),
+          country: v => findRegionByTypeAndField("Country", "Country", v, regions),
+          state: v => findRegionByTypeAndField("State", "State", v, regions),
+          location: v => findRegionByTypeAndField("Location", "LocationId", v, regions)
+        };
+
+        const srcMatch = finders[srcType] ? finders[srcType](srcVal) : null;
+        const dstMatch = finders[dstType] ? finders[dstType](dstVal) : null;
+        const missing = [];
+
+        // UPDATED: buildDiagnostics now takes the user's input value (inputVal)
+    function buildDiagnostics(label, match, inputVal) {
+      if (!match) return `<div class='step-miss'>No Region Details found for ${label}.</div>`;
+      const region = match.region;
+      const schema = findSchemaEntry(schemas, region.RegionSchemaName);
+      const lookup = findLookupEntry(lookups, region.RegionSchemaName);
+      if (!schema) schemaMissing = true;
+      if (!lookup) lookupMissing = true;
+      return `
+        <div class='box'>
+          <strong>${label}:</strong> <span class='highlight'>${escapeHtml(inputVal || "")}</span>
+          <div class='stat'>Region: ${escapeHtml(region.RegionName)}</div>
+          <div class='stat'>RegionDtl (matched): ${escapeHtml(match.dtl.ZipStart || "")} → ${escapeHtml(match.dtl.ZipEnd || match.dtl.ZipStart || "")}</div>
+          <div class='stat'>Region Schema: ${escapeHtml(region.RegionSchemaName || "Not Available")}</div>
+          <div class='stat'>Region Look Up: ${escapeHtml(region.RegionSchemaName || "Not Available")}</div>
+          <div><strong>Diagnostics</strong></div>
+          ${schema ? `<div class='step-ok'>✓ Region Schema "${escapeHtml(region.RegionSchemaName)}" found.</div>` : `<div class='step-miss'>✖ Region Schema missing.</div>`}
+          ${lookup ? `<div class='step-ok'>✓ Region Look Up "${escapeHtml(region.RegionSchemaName)}" found.</div>` : `<div class='step-miss'>✖ Region Look Up missing.</div>`}
+        </div>`;
+    }
+
+        // pass the user-entered values when building diagnostics
+        const srcHtml = buildDiagnostics("Source", srcMatch, srcVal);
+        const dstHtml = buildDiagnostics("Destination", dstMatch, dstVal);
+
+
+        let zone = null, transit = null;
+        if (srcMatch && dstMatch) {
+          zone = zones.find(z => String(z.OriginRegion) === String(srcMatch.region.RegionName) && String(z.DestinationRegion) === String(dstMatch.region.RegionName)) || null;
+          if (zone) transit = transits.find(t => String(t.ZoneId) === String(zone.ZoneId)) || null;
+        }
+
+        let carrierError = "", serviceError = "";
+        if (zone) {
+          if (carrier && String(zone.CarrierCode || "").trim() !== carrier)
+            carrierError = "Carrier Code mismatch in Zone.";
+          if (service && String(zone.ServiceLevel || "").trim() !== service)
+            serviceError = "Service Level mismatch in Zone.";
+        }
+        if (transit && carrier && String(transit.CarrierCode || "").trim() !== carrier)
+          carrierError = "Carrier Code mismatch between Zone and Transit Lane.";
+
+        const zoneHtml = zone
+          ? `<div class='box'>
+              <strong>Zone Details</strong><br>
+              <div>Zone: ${escapeHtml(zone.ZoneId)} (${escapeHtml(zone.OriginRegion)} → ${escapeHtml(zone.DestinationRegion)})</div>
+              <div>CarrierCode / ServiceLevel: ${zone.CarrierCode ? this.escapeHtml(zone.CarrierCode): "<span class='step-miss'>Not Available</span>"} / ${zone.ServiceLevel || zone.ServiceLevelCode ? this.escapeHtml(zone.ServiceLevel || zone.ServiceLevelCode): "<span class='step-miss'>Not Available</span>"}</div>
+              <div>Transit Time: ${transit ? this.escapeHtml(transit.TransitTime) : "<span class='step-miss'>Not Available</span>"}</div>
+              ${carrierError ? `<div class='step-miss'>${carrierError}</div>` : ""}
+              ${serviceError ? `<div class='step-miss'>${serviceError}</div>` : ""}
+            </div>`
+          : `<div class='step-miss'>Zone missing.</div>`;
+
+        // const flow = `
+        //   <div class='flow'>
+        //     <strong>Flow Chain</strong>
+        //     <div>${this.escapeHtml(srcVal)} → Region "${srcMatch?.region?.RegionName? this.escapeHtml(srcMatch.region.RegionName): "<span class='step-miss'>Not Available</span>"}" →
+        //           ${this.escapeHtml(dstVal)} → Region "${dstMatch?.region?.RegionName? this.escapeHtml(dstMatch.region.RegionName): "<span class='step-miss'>Not Available</span>"}" →
+        //           ${zone? `Zone ${this.escapeHtml(zone.ZoneId)} → Transit Time: ${transit ? this.escapeHtml(transit.TransitTime): "<span class='step-miss'>Not Available</span>"}`: "<span class='step-miss'>No Zone</span>"}
+        //     </div>
+        //   </div>`;
+        const flow = `
+          <div class='flow'>
+            <strong>Route Chain</strong>
+            <div>
+              ${escapeHtml(srcVal)} →
+              Region "${srcMatch?.region?.RegionName
+                ? escapeHtml(srcMatch.region.RegionName)
+                : "<span class='step-miss'>Not Available</span>"}" →
+              Region Schema "${
+                srcMatch
+                  ? (findSchemaEntry(schemas, srcMatch.region.RegionSchemaName)
+                      ? escapeHtml(srcMatch.region.RegionSchemaName)
+                      : "<span class='step-miss'>Missing</span>")
+                  : "<span class='step-miss'>Not Available</span>"
+              }" →
+              Region Look Up "${
+                srcMatch
+                  ? (findLookupEntry(lookups, srcMatch.region.RegionSchemaName)
+                      ? escapeHtml(srcMatch.region.RegionSchemaName)
+                      : "<span class='step-miss'>Missing</span>")
+                  : "<span class='step-miss'>Not Available</span>"
+              }" →
+              ${escapeHtml(dstVal)} →
+              Region "${dstMatch?.region?.RegionName
+                ? escapeHtml(dstMatch.region.RegionName)
+                : "<span class='step-miss'>Not Available</span>"}" →
+              Region Schema "${
+                dstMatch
+                  ? (findSchemaEntry(schemas, dstMatch.region.RegionSchemaName)
+                      ? escapeHtml(dstMatch.region.RegionSchemaName)
+                      : "<span class='step-miss'>Missing</span>")
+                  : "<span class='step-miss'>Not Available</span>"
+              }" →
+              Region Look Up "${
+                dstMatch
+                  ? (findLookupEntry(lookups, dstMatch.region.RegionSchemaName)
+                      ? escapeHtml(dstMatch.region.RegionSchemaName)
+                      : "<span class='step-miss'>Missing</span>")
+                  : "<span class='step-miss'>Not Available</span>"
+              }" →
+              ${
+                zone
+                  ? `Zone ${escapeHtml(zone.ZoneId)} →
+                    Transit Time: ${
+                      transit
+                        ? escapeHtml(transit.TransitTime)
+                        : "<span class='step-miss'>Not Available</span>"
+                    }`
+                  : "<span class='step-miss'>Missing Zone</span>"
+              }
+            </div>
+          </div>`;
+
+        out.innerHTML = `
+          <div style='display:grid;grid-template-columns:1fr 1fr;gap:12px;'>${srcHtml}${dstHtml}</div>
+          ${zoneHtml}
+          ${flow}
+          ${(carrierError || serviceError || !zone || !transit || schemaMissing || lookupMissing)
+            ? "<div class='step-miss'>Scheduling Failed.</div>"
+            : "<div class='step-ok'>Scheduling Successful.</div>"}
+          <div class='small'>Tip: The diagnostics above show EXACTLY which configuration entry is missing for the selected inputs.</div>`;
+      } catch (e) {
+        out.innerHTML = `<div class='step-miss'>Error: ${escapeHtml(e.message)}</div>`;
+      }
+    }
+
+    function clearJsons() {
+      ["regionLookUp", "regionSchema", "regionData", "zonesData", "transitData", "sourceValue", "destValue", "carrierCode", "serviceLevel"]
+        .forEach(id => document.getElementById(id).value = "");
+      document.getElementById("sourceValue").classList.add("hidden");
+      document.getElementById("destValue").classList.add("hidden");
+      document.getElementById("sourceType").value = "";
+      document.getElementById("destType").value = "";
+      document.getElementById("output").innerHTML = "<div class='small'>Cleared inputs.</div>";
+    }
+  </script>
+</body>
+</html>
+
