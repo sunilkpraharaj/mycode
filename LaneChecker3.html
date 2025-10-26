@@ -356,7 +356,7 @@
             serviceError = "Service Level mismatch in Zone.";
         }
         if (transit && carrier && String(transit.CarrierCode || "").trim() !== carrier)
-          carrierError = "Carrier Code mismatch between Zone and Transit Lane.";
+          carrierError = "Carrier Code mismatch between Zone and Transit Time.";
 
         const zoneHtml = zone
           ? `<div class='box'>
