@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATC View Definition JSON Configuration Reader</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .input-section {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .file-input {
+            margin-top: 10px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .results {
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+            position: sticky;
+            top: 0;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .tab {
+            overflow: hidden;
+            border: 1px solid #ccc;
+            background-color: #f1f1f1;
+            border-radius: 5px 5px 0 0;
+        }
+        .tab button {
+            background-color: inherit;
+            float: left;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            padding: 14px 16px;
+            transition: 0.3s;
+            color: #333;
+        }
+        .tab button:hover {
+            background-color: #ddd;
+        }
+        .tab button.active {
+            background-color: #3498db;
+            color: white;
+        }
+        .tabcontent {
+            display: none;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+            background-color: white;
+        }
+        .error {
+            color: #e74c3c;
+            margin-top: 10px;
+        }
+        .view-config {
+            margin-bottom: 30px;
+        }
+        .view-config h2 {
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 5px;
+            color: #2c3e50;
+        }
+        .config-id {
+            font-weight: normal;
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ATC View Definition JSON Configuration Reader</h1>
+        
+        <div class="input-section">
+            <h2>Input JSON</h2>
+            <p>Paste your JSON below or upload a JSON file:</p>
+            <textarea id="jsonInput" placeholder="Paste JSON here..."></textarea>
+            
+            <div class="file-input">
+                <input type="file" id="fileInput" accept=".json">
+                <button onclick="loadFile()">Load from File</button>
+            </div>
+            
+            <button onclick="parseJson()">Parse JSON</button>
+            <div id="error" class="error"></div>
+        </div>
+        
+        <div class="results" id="results" style="display: none;">
+            <h2>Configuration Summary</h2>
+            
+            <div class="tab">
+                <button class="tablinks active" onclick="openTab(event, 'summaryTab')">Summary</button>
+                <button class="tablinks" onclick="openTab(event, 'syncTab')">Sync Details</button>
+                <button class="tablinks" onclick="openTab(event, 'rulesTab')">Rules & Filters</button>
+                <button class="tablinks" onclick="openTab(event, 'alertsTab')">Alerts</button>
+                <button class="tablinks" onclick="openTab(event, 'rawTab')">Raw Data</button>
+            </div>
+            
+            <div id="summaryTab" class="tabcontent" style="display: block;">
+                <div id="summaryContent"></div>
+            </div>
+            
+            <div id="syncTab" class="tabcontent">
+                <div id="syncContent"></div>
+            </div>
+            
+            <div id="rulesTab" class="tabcontent">
+                <div id="rulesContent"></div>
+            </div>
+            
+            <div id="alertsTab" class="tabcontent">
+                <div id="alertsContent"></div>
+            </div>
+            
+            <div id="rawTab" class="tabcontent">
+                <pre id="rawContent"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openTab(evt, tabName) {
+            var i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName("tabcontent");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+            tablinks = document.getElementsByClassName("tablinks");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+            document.getElementById(tabName).style.display = "block";
+            evt.currentTarget.className += " active";
+        }
+
+        function loadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                document.getElementById('error').textContent = 'Please select a file first.';
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('jsonInput').value = e.target.result;
+                document.getElementById('error').textContent = '';
+            };
+            reader.onerror = function() {
+                document.getElementById('error').textContent = 'Error reading file.';
+            };
+            reader.readAsText(file);
+        }
+
+        function parseJson() {
+            const jsonInput = document.getElementById('jsonInput').value;
+            const errorElement = document.getElementById('error');
+            
+            if (!jsonInput.trim()) {
+                errorElement.textContent = 'Please paste or upload a JSON file.';
+                return;
+            }
+            
+            try {
+                const jsonData = JSON.parse(jsonInput);
+                displayResults(jsonData);
+                errorElement.textContent = '';
+                document.getElementById('results').style.display = 'block';
+            } catch (e) {
+                errorElement.textContent = 'Invalid JSON: ' + e.message;
+            }
+        }
+
+        function displayResults(data) {
+            displaySummary(data);
+            displaySyncDetails(data);
+            displayRulesAndFilters(data);
+            displayAlerts(data);
+            displayRawData(data);
+        }
+
+        function displaySummary(data) {
+            const summaryContent = document.getElementById('summaryContent');
+            summaryContent.innerHTML = '';
+            
+            // Main view configuration
+            let html = `
+                <div class="view-config">
+                    <h2>Main View Configuration</h2>
+                    <table>
+                        <tr>
+                            <th>Property</th>
+                            <th>Value</th>
+                        </tr>
+                        <tr>
+                            <td>View Definition ID</td>
+                            <td>${data.ViewDefinitionId || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td>View Config ID</td>
+                            <td>${data.AltViewConfigId || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td>Name</td>
+                            <td>${data.Name || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td>Profile ID</td>
+                            <td>${data.ProfileId || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td>View Type</td>
+                            <td>${data.ViewType?.ViewTypeId || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td>Created</td>
+                            <td>${data.CreatedTimestamp || 'N/A'} by ${data.CreatedBy || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td>Updated</td>
+                            <td>${data.UpdatedTimestamp || 'N/A'} by ${data.UpdatedBy || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td>Active</td>
+                            <td>${data.Active !== undefined ? data.Active : 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td>Out of Stock Level</td>
+                            <td>${data.ViewConfiguration?.[0]?.OutOfStockLevel || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td>Limited Stock Level</td>
+                            <td>${data.ViewConfiguration?.[0]?.LimitedStockLevel || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td>Publish Quantity</td>
+                            <td>${data.ViewConfiguration?.[0]?.PublishQuantity !== undefined ? data.ViewConfiguration[0].PublishQuantity : 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td>Publish Status</td>
+                            <td>${data.ViewConfiguration?.[0]?.PublishStatus !== undefined ? data.ViewConfiguration[0].PublishStatus : 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td>Sync Type</td>
+                            <td>${data.ViewConfiguration?.[0]?.SyncType?.SyncTypeId || 'N/A'}</td>
+                        </tr>
+                    </table>
+                </div>
+            `;
+            
+            // View Configurations
+            if (data.ViewConfiguration && data.ViewConfiguration.length > 0) {
+                html += `<div class="view-config"><h2>View Configurations</h2>`;
+                
+                data.ViewConfiguration.forEach((config, index) => {
+                    html += `
+                        <h3>Configuration ${index + 1}: ${config.Name || 'Unnamed'} <span class="config-id">(ID: ${config.ViewConfigId || 'N/A'})</span></h3>
+                        <table>
+                            <tr>
+                                <th>Property</th>
+                                <th>Value</th>
+                            </tr>
+                            <tr>
+                                <td>View Config ID</td>
+                                <td>${config.ViewConfigId || 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <td>Name</td>
+                                <td>${config.Name || 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <td>Active</td>
+                                <td>${config.Active !== undefined ? config.Active : 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <td>Created</td>
+                                <td>${config.CreatedTimestamp || 'N/A'} by ${config.CreatedBy || 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <td>Updated</td>
+                                <td>${config.UpdatedTimestamp || 'N/A'} by ${config.UpdatedBy || 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <td>Out of Stock Level</td>
+                                <td>${config.OutOfStockLevel || 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <td>Limited Stock Level</td>
+                                <td>${config.LimitedStockLevel || 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <td>Exclude Back Order Quantity</td>
+                                <td>${config.ExcludeBackOrderQuantity !== undefined ? config.ExcludeBackOrderQuantity : 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <td>Include Substitutions</td>
+                                <td>${config.IncludeSubstitutions !== undefined ? config.IncludeSubstitutions : 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <td>Display Max Quantity</td>
+                                <td>${config.DisplayMaxQuantity !== undefined ? config.DisplayMaxQuantity : 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <td>Include Infinite Avail Items</td>
+                                <td>${config.IncludeInfiniteAvailItems !== undefined ? config.IncludeInfiniteAvailItems : 'N/A'}</td>
+                            </tr>
+                        </table>
+                    `;
+                });
+                
+                html += `</div>`;
+            }
+            
+            summaryContent.innerHTML = html;
+        }
+
+        function displaySyncDetails(data) {
+            const syncContent = document.getElementById('syncContent');
+            syncContent.innerHTML = '';
+            
+            let html = `<div class="view-config"><h2>Sync Details</h2>`;
+            
+            if (data.ViewConfiguration && data.ViewConfiguration.length > 0) {
+                data.ViewConfiguration.forEach((config, configIndex) => {
+                    html += `
+                        <h3>Configuration ${configIndex + 1}: ${config.Name || 'Unnamed'} <span class="config-id">(ID: ${config.ViewConfigId || 'N/A'})</span></h3>
+                        <p>Sync Format: ${config.PublishSyncFormatId?.ViewSyncFormatId || 'N/A'}</p>
+                        <p>Enable Delta Sync: ${config.EnableDeltaSync !== undefined ? config.EnableDeltaSync : 'N/A'}</p>
+                        <p>Delta Sync Frequency: ${config.DeltaSyncFrequency || 'N/A'}</p>
+                        
+                        <h4>Sync Schedule</h4>
+                    `;
+                    
+                    if (config.ViewSyncDetail && config.ViewSyncDetail.length > 0) {
+                        html += `
+                            <table>
+                                <tr>
+                                    <th>Day of Week</th>
+                                    <th>Time (mins)</th>
+                                    <th>Time (HH:MM)</th>
+                                    <th>Cron Expression</th>
+                                </tr>
+                        `;
+                        
+                        config.ViewSyncDetail.forEach(sync => {
+                            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                            const dayName = dayNames[(sync.DayOfWeek - 1) % 7] || sync.DayOfWeek;
+                            const hours = Math.floor(sync.TimeInMins / 60);
+                            const minutes = sync.TimeInMins % 60;
+                            const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                            
+                            html += `
+                                <tr>
+                                    <td>${dayName}</td>
+                                    <td>${sync.TimeInMins || '0'}</td>
+                                    <td>${timeString}</td>
+                                    <td>${sync.CronExpression || 'N/A'}</td>
+                                </tr>
+                            `;
+                        });
+                        
+                        html += `</table>`;
+                    } else {
+                        html += `<p>No sync details available.</p>`;
+                    }
+                });
+            } else {
+                html += `<p>No view configurations available.</p>`;
+            }
+            
+            html += `</div>`;
+            syncContent.innerHTML = html;
+        }
+
+        function displayRulesAndFilters(data) {
+            const rulesContent = document.getElementById('rulesContent');
+            rulesContent.innerHTML = '';
+            
+            let html = `<div class="view-config"><h2>Rules and Filters</h2>`;
+            
+            if (data.ViewConfiguration && data.ViewConfiguration.length > 0) {
+                data.ViewConfiguration.forEach((config, configIndex) => {
+                    html += `
+                        <h3>Configuration ${configIndex + 1}: ${config.Name || 'Unnamed'} <span class="config-id">(ID: ${config.ViewConfigId || 'N/A'})</span></h3>
+                    `;
+                    
+                    if (config.ViewRuleSet && config.ViewRuleSet.length > 0) {
+                        config.ViewRuleSet.forEach((ruleSet, ruleSetIndex) => {
+                            html += `
+                                <h4>Rule Set ${ruleSetIndex + 1}: ${ruleSet.Name || 'Unnamed'}</h4>
+                                <table>
+                                    <tr>
+                                        <th>Property</th>
+                                        <th>Value</th>
+                                    </tr>
+                                    <tr>
+                                        <td>Name</td>
+                                        <td>${ruleSet.Name || 'N/A'}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Location Type</td>
+                                        <td>${ruleSet.LocationTypeId || 'N/A'}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Sequence Number</td>
+                                        <td>${ruleSet.SequenceNumber || 'N/A'}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Include All Items</td>
+                                        <td>${ruleSet.IncludeAllItems !== undefined ? ruleSet.IncludeAllItems : 'N/A'}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Include All Locations</td>
+                                        <td>${ruleSet.IncludeAllLocations !== undefined ? ruleSet.IncludeAllLocations : 'N/A'}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Include All On Hand</td>
+                                        <td>${ruleSet.IncludeAllOnHand !== undefined ? ruleSet.IncludeAllOnHand : 'N/A'}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Include All On Order</td>
+                                        <td>${ruleSet.IncludeAllOnOrder !== undefined ? ruleSet.IncludeAllOnOrder : 'N/A'}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Include All In Transit</td>
+                                        <td>${ruleSet.IncludeAllInTransit !== undefined ? ruleSet.IncludeAllInTransit : 'N/A'}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Include All Commerce Items</td>
+                                        <td>${ruleSet.IncludeAllCommerceItems !== undefined ? ruleSet.IncludeAllCommerceItems : 'N/A'}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Apply Capacity</td>
+                                        <td>${ruleSet.ApplyCapacity !== undefined ? ruleSet.ApplyCapacity : 'N/A'}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>On Hand Protection Type</td>
+                                        <td>${ruleSet.OnHandInventoryProtectionType?.ProtectionTypeId || 'N/A'}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>On Hand Protection Value</td>
+                                        <td>${ruleSet.OnHandInventoryProtectionValue || 'N/A'}</td>
+                                    </tr>
+                                </table>
+                            `;
+                            
+                            if (ruleSet.ViewRuleSetFilter && ruleSet.ViewRuleSetFilter.length > 0) {
+                                html += `
+                                    <h5>Filters</h5>
+                                    <table>
+                                        <tr>
+                                            <th>Filter Name</th>
+                                            <th>Type</th>
+                                            <th>Rank</th>
+                                            <th>Filter Expression</th>
+                                        </tr>
+                                `;
+                                
+                                ruleSet.ViewRuleSetFilter.forEach(filter => {
+                                    html += `
+                                        <tr>
+                                            <td>${filter.FilterName || 'N/A'}</td>
+                                            <td>${filter.FilterType?.FilterTypeId || 'N/A'}</td>
+                                            <td>${filter.FilterRank || 'N/A'}</td>
+                                            <td>${filter.Filter || 'N/A'}</td>
+                                        </tr>
+                                    `;
+                                });
+                                
+                                html += `</table>`;
+                            } else {
+                                html += `<p>No filters defined for this rule set.</p>`;
+                            }
+                        });
+                    } else {
+                        html += `<p>No rule sets defined.</p>`;
+                    }
+                    
+                    if (config.ViewAvailabilityRule && config.ViewAvailabilityRule.length > 0) {
+                        html += `
+                            <h4>Availability Rules</h4>
+                            <table>
+                                <tr>
+                                    <th>Rule Property</th>
+                                    <th>Value</th>
+                                </tr>
+                        `;
+                        
+                        // Add availability rules here if needed
+                        
+                        html += `</table>`;
+                    }
+                });
+            } else {
+                html += `<p>No view configurations available.</p>`;
+            }
+            
+            html += `</div>`;
+            rulesContent.innerHTML = html;
+        }
+
+        function displayAlerts(data) {
+            const alertsContent = document.getElementById('alertsContent');
+            alertsContent.innerHTML = '';
+            
+            let html = `<div class="view-config"><h2>Alert Configuration</h2>`;
+            
+            if (data.ViewConfiguration && data.ViewConfiguration.length > 0) {
+                data.ViewConfiguration.forEach((config, configIndex) => {
+                    html += `
+                        <h3>Configuration ${configIndex + 1}: ${config.Name || 'Unnamed'} <span class="config-id">(ID: ${config.ViewConfigId || 'N/A'})</span></h3>
+                    `;
+                    
+                    if (config.ViewAlertConfiguration) {
+                        const alertConfig = config.ViewAlertConfiguration;
+                        html += `
+                            <table>
+                                <tr>
+                                    <th>Property</th>
+                                    <th>Value</th>
+                                </tr>
+                                <tr>
+                                    <td>Publish Availability Alert</td>
+                                    <td>${alertConfig.PublishAvailabilityAlert !== undefined ? alertConfig.PublishAvailabilityAlert : 'N/A'}</td>
+                                </tr>
+                                <tr>
+                                    <td>Publish When Out of Stock</td>
+                                    <td>${alertConfig.PublishWhenOutOfStock !== undefined ? alertConfig.PublishWhenOutOfStock : 'N/A'}</td>
+                                </tr>
+                                <tr>
+                                    <td>Publish Next Availability Date</td>
+                                    <td>${alertConfig.PublishNextAvailabilityDate !== undefined ? alertConfig.PublishNextAvailabilityDate : 'N/A'}</td>
+                                </tr>
+                                <tr>
+                                    <td>Publish Alert On First Future Date</td>
+                                    <td>${alertConfig.PublishAlertOnFirstFutureDate !== undefined ? alertConfig.PublishAlertOnFirstFutureDate : 'N/A'}</td>
+                                </tr>
+                                <tr>
+                                    <td>Created</td>
+                                    <td>${alertConfig.CreatedTimestamp || 'N/A'} by ${alertConfig.CreatedBy || 'N/A'}</td>
+                                </tr>
+                                <tr>
+                                    <td>Updated</td>
+                                    <td>${alertConfig.UpdatedTimestamp || 'N/A'} by ${alertConfig.UpdatedBy || 'N/A'}</td>
+                                </tr>
+                            </table>
+                        `;
+                    } else {
+                        html += `<p>No alert configuration defined.</p>`;
+                    }
+                    
+                    if (config.ViewOutageReason && config.ViewOutageReason.length > 0) {
+                        html += `
+                            <h4>Outage Reasons</h4>
+                            <table>
+                                <tr>
+                                    <th>Reason</th>
+                                </tr>
+                        `;
+                        
+                        config.ViewOutageReason.forEach(reason => {
+                            html += `
+                                <tr>
+                                    <td>${reason.ViewOutageReasonId?.OutageReasonId || 'N/A'}</td>
+                                </tr>
+                            `;
+                        });
+                        
+                        html += `</table>`;
+                    }
+                });
+            } else {
+                html += `<p>No view configurations available.</p>`;
+            }
+            
+            html += `</div>`;
+            alertsContent.innerHTML = html;
+        }
+
+        function displayRawData(data) {
+            const rawContent = document.getElementById('rawContent');
+            rawContent.textContent = JSON.stringify(data, null, 2);
+        }
+    </script>
+</body>
+</html>
