@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -150,9 +151,12 @@
       margin-top: 8px;
     }
 
-    .hidden { display: none; }
+    .hidden {
+      display: none;
+    }
   </style>
 </head>
+
 <body>
   <div class="container">
     <h1>Lane Diagnostics</h1>
@@ -311,20 +315,26 @@
           state: v => findRegionByTypeAndField("State", "State", v, regions),
           location: v => findRegionByTypeAndField("Location", "LocationId", v, regions)
         };
+        // Build zone lookup map (must be before usage)
+        const zoneMap = {};
+        zones.forEach(z => {
+          const key = String(z.OriginRegion) + "|" + String(z.DestinationRegion);
+          zoneMap[key] = z;
+        });
 
         const srcMatch = finders[srcType] ? finders[srcType](srcVal) : null;
         const dstMatch = finders[dstType] ? finders[dstType](dstVal) : null;
         const missing = [];
 
         // UPDATED: buildDiagnostics now takes the user's input value (inputVal)
-    function buildDiagnostics(label, match, inputVal) {
-      if (!match) return `<div class='step-miss'>No Region Details found for ${label}.</div>`;
-      const region = match.region;
-      const schema = findSchemaEntry(schemas, region.RegionSchemaName);
-      const lookup = findLookupEntry(lookups, region.RegionSchemaName);
-      if (!schema) schemaMissing = true;
-      if (!lookup) lookupMissing = true;
-      return `
+        function buildDiagnostics(label, match, inputVal) {
+          if (!match) return `<div class='step-miss'>No Region Details found for ${label}.</div>`;
+          const region = match.region;
+          const schema = findSchemaEntry(schemas, region.RegionSchemaName);
+          const lookup = findLookupEntry(lookups, region.RegionSchemaName);
+          if (!schema) schemaMissing = true;
+          if (!lookup) lookupMissing = true;
+          return `
         <div class='box'>
           <strong>${label}:</strong> <span class='highlight'>${escapeHtml(inputVal || "")}</span>
           <div class='stat'>Region: ${escapeHtml(region.RegionName)}</div>
@@ -335,7 +345,7 @@
           ${schema ? `<div class='step-ok'>✓ Region Schema "${escapeHtml(region.RegionSchemaName)}" found.</div>` : `<div class='step-miss'>✖ Region Schema missing.</div>`}
           ${lookup ? `<div class='step-ok'>✓ Region Look Up "${escapeHtml(region.RegionSchemaName)}" found.</div>` : `<div class='step-miss'>✖ Region Look Up missing.</div>`}
         </div>`;
-    }
+        }
 
         // pass the user-entered values when building diagnostics
         const srcHtml = buildDiagnostics("Source", srcMatch, srcVal);
@@ -343,9 +353,17 @@
 
 
         let zone = null, transit = null;
+        // if (srcMatch && dstMatch) {
+        //   zone = zones.find(z => String(z.OriginRegion) === String(srcMatch.region.RegionName) && String(z.DestinationRegion) === String(dstMatch.region.RegionName)) || null;
+        //   if (zone) transit = transits.find(t => String(t.ZoneId) === String(zone.ZoneId)) || null;
+        // }
         if (srcMatch && dstMatch) {
-          zone = zones.find(z => String(z.OriginRegion) === String(srcMatch.region.RegionName) && String(z.DestinationRegion) === String(dstMatch.region.RegionName)) || null;
-          if (zone) transit = transits.find(t => String(t.ZoneId) === String(zone.ZoneId)) || null;
+          const key = String(srcMatch.region.RegionName) + "|" + String(dstMatch.region.RegionName);
+          zone = zoneMap[key] || null;
+
+          if (zone) {
+            transit = transits.find(t => String(t.ZoneId) === String(zone.ZoneId)) || null;
+          }
         }
 
         let carrierError = "", serviceError = "";
@@ -362,7 +380,7 @@
           ? `<div class='box'>
               <strong>Zone Details</strong><br>
               <div>Zone: ${escapeHtml(zone.ZoneId)} (${escapeHtml(zone.OriginRegion)} → ${escapeHtml(zone.DestinationRegion)})</div>
-              <div>CarrierCode / ServiceLevel: ${zone.CarrierCode ? this.escapeHtml(zone.CarrierCode): "<span class='step-miss'>Not Available</span>"} / ${zone.ServiceLevel || zone.ServiceLevelCode ? this.escapeHtml(zone.ServiceLevel || zone.ServiceLevelCode): "<span class='step-miss'>Not Available</span>"}</div>
+              <div>CarrierCode / ServiceLevel: ${zone.CarrierCode ? this.escapeHtml(zone.CarrierCode) : "<span class='step-miss'>Not Available</span>"} / ${zone.ServiceLevel || zone.ServiceLevelCode ? this.escapeHtml(zone.ServiceLevel || zone.ServiceLevelCode) : "<span class='step-miss'>Not Available</span>"}</div>
               <div>Transit Time: ${transit ? this.escapeHtml(transit.TransitTime) : "<span class='step-miss'>Not Available</span>"}</div>
               ${carrierError ? `<div class='step-miss'>${carrierError}</div>` : ""}
               ${serviceError ? `<div class='step-miss'>${serviceError}</div>` : ""}
@@ -383,50 +401,44 @@
             <div>
               ${escapeHtml(srcVal)} →
               Region "${srcMatch?.region?.RegionName
-                ? escapeHtml(srcMatch.region.RegionName)
-                : "<span class='step-miss'>Not Available</span>"}" →
-              Region Schema "${
-                srcMatch
-                  ? (findSchemaEntry(schemas, srcMatch.region.RegionSchemaName)
-                      ? escapeHtml(srcMatch.region.RegionSchemaName)
-                      : "<span class='step-miss'>Missing</span>")
-                  : "<span class='step-miss'>Not Available</span>"
-              }" →
-              Region Look Up "${
-                srcMatch
-                  ? (findLookupEntry(lookups, srcMatch.region.RegionSchemaName)
-                      ? escapeHtml(srcMatch.region.RegionSchemaName)
-                      : "<span class='step-miss'>Missing</span>")
-                  : "<span class='step-miss'>Not Available</span>"
-              }" →
+            ? escapeHtml(srcMatch.region.RegionName)
+            : "<span class='step-miss'>Not Available</span>"}" →
+              Region Schema "${srcMatch
+            ? (findSchemaEntry(schemas, srcMatch.region.RegionSchemaName)
+              ? escapeHtml(srcMatch.region.RegionSchemaName)
+              : "<span class='step-miss'>Missing</span>")
+            : "<span class='step-miss'>Not Available</span>"
+          }" →
+              Region Look Up "${srcMatch
+            ? (findLookupEntry(lookups, srcMatch.region.RegionSchemaName)
+              ? escapeHtml(srcMatch.region.RegionSchemaName)
+              : "<span class='step-miss'>Missing</span>")
+            : "<span class='step-miss'>Not Available</span>"
+          }" →
               ${escapeHtml(dstVal)} →
               Region "${dstMatch?.region?.RegionName
-                ? escapeHtml(dstMatch.region.RegionName)
-                : "<span class='step-miss'>Not Available</span>"}" →
-              Region Schema "${
-                dstMatch
-                  ? (findSchemaEntry(schemas, dstMatch.region.RegionSchemaName)
-                      ? escapeHtml(dstMatch.region.RegionSchemaName)
-                      : "<span class='step-miss'>Missing</span>")
-                  : "<span class='step-miss'>Not Available</span>"
-              }" →
-              Region Look Up "${
-                dstMatch
-                  ? (findLookupEntry(lookups, dstMatch.region.RegionSchemaName)
-                      ? escapeHtml(dstMatch.region.RegionSchemaName)
-                      : "<span class='step-miss'>Missing</span>")
-                  : "<span class='step-miss'>Not Available</span>"
-              }" →
-              ${
-                zone
-                  ? `Zone ${escapeHtml(zone.ZoneId)} →
-                    Transit Time: ${
-                      transit
-                        ? escapeHtml(transit.TransitTime)
-                        : "<span class='step-miss'>Not Available</span>"
-                    }`
-                  : "<span class='step-miss'>Missing Zone</span>"
-              }
+            ? escapeHtml(dstMatch.region.RegionName)
+            : "<span class='step-miss'>Not Available</span>"}" →
+              Region Schema "${dstMatch
+            ? (findSchemaEntry(schemas, dstMatch.region.RegionSchemaName)
+              ? escapeHtml(dstMatch.region.RegionSchemaName)
+              : "<span class='step-miss'>Missing</span>")
+            : "<span class='step-miss'>Not Available</span>"
+          }" →
+              Region Look Up "${dstMatch
+            ? (findLookupEntry(lookups, dstMatch.region.RegionSchemaName)
+              ? escapeHtml(dstMatch.region.RegionSchemaName)
+              : "<span class='step-miss'>Missing</span>")
+            : "<span class='step-miss'>Not Available</span>"
+          }" →
+              ${zone
+            ? `Zone ${escapeHtml(zone.ZoneId)} →
+                    Transit Time: ${transit
+              ? escapeHtml(transit.TransitTime)
+              : "<span class='step-miss'>Not Available</span>"
+            }`
+            : "<span class='step-miss'>Missing Zone</span>"
+          }
             </div>
           </div>`;
 
@@ -454,5 +466,5 @@
     }
   </script>
 </body>
-</html>
 
+</html>
