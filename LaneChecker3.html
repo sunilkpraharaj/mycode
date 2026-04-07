@@ -310,7 +310,7 @@
         const service = document.getElementById("serviceLevel").value.trim();
 
         const finders = {
-          zipcode: v => findRegionForZip(v, regions),
+          zipcode: v => findRegionForZipBinary(v),
           country: v => findRegionByTypeAndField("Country", "Country", v, regions),
           state: v => findRegionByTypeAndField("State", "State", v, regions),
           location: v => findRegionByTypeAndField("Location", "LocationId", v, regions)
@@ -320,6 +320,60 @@
         zones.forEach(z => {
           const key = String(z.OriginRegion) + "|" + String(z.DestinationRegion);
           zoneMap[key] = z;
+        });
+        // ===== Optimized Zip Range (Binary Search) =====
+        const zipRanges = [];
+
+        regions.forEach(region => {
+          (region.RegionDtl || []).forEach(dtl => {
+            const start = parseInt(dtl.ZipStart, 10);
+            const end = parseInt(dtl.ZipEnd, 10);
+
+            if (!isNaN(start) && !isNaN(end)) {
+              zipRanges.push({
+                start,
+                end,
+                region,
+                dtl
+              });
+            }
+          });
+        });
+
+        function findRegionForZipBinary(zip) {
+          const target = parseInt(zip, 10);
+          if (isNaN(target)) return null;
+
+          let left = 0;
+          let right = zipRanges.length - 1;
+
+          while (left <= right) {
+            const mid = Math.floor((left + right) / 2);
+            const range = zipRanges[mid];
+
+            if (target >= range.start && target <= range.end) {
+              return { region: range.region, dtl: range.dtl };
+            }
+
+            if (target < range.start) {
+              right = mid - 1;
+            } else {
+              left = mid + 1;
+            }
+          }
+
+          return null;
+        }
+
+        // Sort ranges by start
+        zipRanges.sort((a, b) => a.start - b.start);
+
+        // ===== Optimized Transit Map =====
+        const transitMap = {};
+
+        transits.forEach(t => {
+          const key = String(t.ZoneId);
+          transitMap[key] = t;
         });
 
         const srcMatch = finders[srcType] ? finders[srcType](srcVal) : null;
@@ -362,7 +416,7 @@
           zone = zoneMap[key] || null;
 
           if (zone) {
-            transit = transits.find(t => String(t.ZoneId) === String(zone.ZoneId)) || null;
+            transit = transitMap[String(zone.ZoneId)] || null;
           }
         }
 
